@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Employee model for host management
+model Employee {
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  phone         String?
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id], name: "EmployeeDepartment")
+  role          EmployeeRole @default(EMPLOYEE)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  hostedVisitors Visitor[]
+  notifications  Notification[]
+  attendance     Attendance[]
+  managedDepartment Department? @relation(name: "DepartmentManager")
+  
+  @@map("employees")
+}
+
+// Department model for organization structure
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  managerId   String?
+  manager     Employee? @relation(fields: [managerId], references: [id], name: "DepartmentManager")
+  employees   Employee[] @relation("EmployeeDepartment")
+  visitors    Visitor[]
+  queueTokens QueueToken[]
+  attendance  Attendance[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("departments")
+}
+
+// Visitor model for visitor management
+model Visitor {
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  company       String?
+  purpose       String
+  hostId        String?
+  host          Employee? @relation(fields: [hostId], references: [id])
+  checkInTime   DateTime
+  checkOutTime  DateTime?
+  status        VisitorStatus @default(PENDING)
+  badgeNumber   String?
+  qrCode        String?
+  photo         String?
+  signature     String?
+  preRegistered Boolean @default(false)
+  preRegToken   String?
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  notifications Notification[]
+  queueTokens   QueueToken[]
+  badge         Badge?
+  
+  @@map("visitors")
+}
+
+// Notification model for real-time alerts
+model Notification {
+  id          String   @id @default(cuid())
+  type        NotificationType
+  title       String
+  message     String
+  recipientId String
+  recipient   Employee @relation(fields: [recipientId], references: [id])
+  visitorId   String?
+  visitor     Visitor? @relation(fields: [visitorId], references: [id])
+  isRead      Boolean @default(false)
+  createdAt   DateTime @default(now())
+  
+  @@map("notifications")
+}
+
+// Badge model for visitor ID cards
+model Badge {
+  id          String   @id @default(cuid())
+  visitorId   String   @unique
+  visitor     Visitor  @relation(fields: [visitorId], references: [id])
+  badgeNumber String   @unique
+  template    String   // JSON template for badge design
+  photo       String?  // Base64 encoded photo
+  qrCode      String   // QR code data
+  printed     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  @@map("badges")
+}
+
+// Queue management system
+model QueueToken {
+  id           String   @id @default(cuid())
+  visitorId    String
+  visitor      Visitor  @relation(fields: [visitorId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  tokenNumber  String   @unique
+  status       QueueStatus @default(PENDING)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@map("queue_tokens")
+}
+
+// Employee attendance tracking
+model Attendance {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  checkInTime  DateTime
+  checkOutTime DateTime?
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@map("attendance")
+}
+
+// Visitor pre-registration
+model PreRegistration {
+  id          String   @id @default(cuid())
+  visitorId   String   @unique
+  visitor     Visitor  @relation(fields: [visitorId], references: [id])
+  token       String   @unique
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  @@map("pre_registrations")
+}
+
+// Notification types
+enum NotificationType {
+  VISITOR_ARRIVAL
+  VISITOR_CHECKOUT
+  EMPLOYEE_ALERT
+  SYSTEM_ALERT
+}
+
+// Visitor status
+enum VisitorStatus {
+  PENDING
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+// Employee role
+enum EmployeeRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  SECURITY
+}
+
+// Queue status
+enum QueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
